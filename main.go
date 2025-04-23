@@ -38,13 +38,13 @@ var (
 )
 
 func main() {
-	fmt.Println("🚀 Discovery server running on :8080")
+	fmt.Println("🚀 Discovery server running on :9090")
 	initJWKS()
 
 	http.HandleFunc("/register-peer", registerPeerHandler)
 	http.HandleFunc("/peers", getPeersHandler)
 
-	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil)) // public interface
+	log.Fatal(http.ListenAndServe("0.0.0.0:9090", nil)) // public interface
 }
 
 func initJWKS() {
