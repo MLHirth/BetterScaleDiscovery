@@ -37,12 +37,39 @@ var (
 	peerMu sync.RWMutex
 )
 
+const peerTimeout = 30 * time.Second
+
 func main() {
 	fmt.Println("🚀 Discovery server running on :9090")
 	initJWKS()
 
 	http.HandleFunc("/register-peer", registerPeerHandler)
 	http.HandleFunc("/peers", getPeersHandler)
+
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+			peerMu.Lock()
+			for userID, userPeers := range peers {
+				fresh := []Peer{}
+				now := time.Now().Unix()
+				for _, p := range userPeers {
+					if now-p.LastSeen <= int64(peerTimeout.Seconds()) {
+						fresh = append(fresh, p)
+					}
+				}
+				if len(fresh) > 0 {
+					peers[userID] = fresh
+				} else {
+					delete(peers, userID)
+				}
+				log.Printf("🧹 Cleaned up stale peers for user %s", userID)
+			}
+			peerMu.Unlock()
+
+		}
+
+	}()
 
 	log.Fatal(http.ListenAndServe("0.0.0.0:9090", nil)) // public interface
 }
@@ -150,8 +177,12 @@ func getPeersHandler(w http.ResponseWriter, r *http.Request) {
 	defer peerMu.RUnlock()
 
 	visible := []Peer{}
+	now := time.Now().Unix()
 	for _, p := range peers[userID] {
-		if peerID == "" || p.PeerID != peerID {
+		if peerID != "" && p.PeerID == peerID {
+			continue
+		}
+		if now-p.LastSeen <= int64(peerTimeout.Seconds()) {
 			visible = append(visible, p)
 		}
 	}
@@ -162,9 +193,10 @@ func getPeersHandler(w http.ResponseWriter, r *http.Request) {
 
 func respondWithPeers(w http.ResponseWriter, userID string, requestingPeerID string) {
 	visible := []Peer{}
+	now := time.Now().Unix()
 
 	for _, p := range peers[userID] {
-		if p.PeerID != requestingPeerID {
+		if p.PeerID != requestingPeerID && now-p.LastSeen <= int64(peerTimeout.Seconds()) {
 			visible = append(visible, p)
 		}
 	}
