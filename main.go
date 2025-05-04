@@ -179,8 +179,8 @@ func getPeersHandler(w http.ResponseWriter, r *http.Request) {
 	visible := []Peer{}
 	now := time.Now().Unix()
 	for _, p := range peers[userID] {
-		if peerID != "" && p.PeerID == peerID {
-			continue
+		if p.PeerID == peerID {
+			continue // ❌ skip the caller's own entry
 		}
 		if now-p.LastSeen <= int64(peerTimeout.Seconds()) {
 			visible = append(visible, p)
